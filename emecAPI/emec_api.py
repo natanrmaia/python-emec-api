@@ -1,5 +1,5 @@
-from .utils.fields import convert_text_to_base64, convert_b64_to_text, normalize_key
-import aiohttp
+from .utils.fields import convert_text_to_base64, convert_b64_to_text, normalize_key, set_url
+import aiohttp, json
 from typing import Optional
 import logging
 from bs4 import BeautifulSoup
@@ -69,6 +69,21 @@ class EmecAPI:
             self.logger.error(msg)
             self.errors[method] = msg
             raise exception
+
+    def __handle_warning(self, method: str, warning: str) -> None:
+        """
+        Handles warnings that occur in the specified method.
+
+        Args:
+            method (str): The name of the method where the warning occurred.
+            warning (str): The warning message.
+
+        Returns:
+            None
+        """
+        msg = f'Warning in method >> {method} <<. {warning}'
+        self.logger.warning(msg)
+        self.warnings[method] = msg
 
     def __check_methods(self) -> None:
         """
@@ -150,5 +165,52 @@ class EmecAPI:
         #     case _:
         #         self.__handle_exception('__handle_method', ValueError(f'Method {method} is not allowed.'))
 
-    async def __get(self, url: str) -> BeautifulSoup:
-        pass
+    async def __get(self, method: str, course_id_b64: str = None) -> BeautifulSoup:
+        """
+        Sends a GET request to the specified URL and returns the parsed HTML content as a BeautifulSoup object.
+
+        Parameters:
+            url (str): The URL to send the GET request to.
+
+        Returns:
+            BeautifulSoup: The parsed HTML content as a BeautifulSoup object.
+
+        Raises:
+            Exception: If the HTTP response status is not 200, an exception is raised with the corresponding status code and reason.
+        """
+
+        if method == 'courses_details' and course_id_b64 is None:
+            self.__handle_exception('__get', Exception('Course id not provided for method courses_details!'))
+
+        url = set_url(method, self.ies_id_b64, course_id_b64)
+
+        async with self.session.get(url) as response:
+            if response.status == 200:
+                return BeautifulSoup(await response.text(), 'html.parser')
+            else:
+                self.__handle_exception('__get', Exception(f'HTTP {response.status} - {response.reason}'))
+
+    def to_dict(self) -> dict:
+        """Converts the data to dict format.
+
+        Returns:
+            dict: Returns the data in dict format.
+        """
+        if self.ies_data:
+            return self.ies_data
+        else:
+            self.__handle_warning('to_dict', 'No data to convert to dict.')
+            return {}
+
+    def to_json(self) -> str:
+        """Converts the data to JSON format.
+
+        Returns:
+            str: Returns the data in JSON format.
+        """
+        if self.ies_data:
+            return json.dumps(self.ies_data)
+        else:
+            self.__handle_warning('to_json', 'No data to convert to JSON.')
+            return '{}'
+
