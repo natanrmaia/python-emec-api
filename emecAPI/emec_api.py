@@ -2,6 +2,7 @@ from .utils.fields import convert_text_to_base64, convert_b64_to_text, normalize
 import aiohttp
 from typing import Optional
 import logging
+from bs4 import BeautifulSoup
 
 class EmecAPI:
     def __init__(self) -> None:
@@ -11,7 +12,7 @@ class EmecAPI:
         Returns:
             None
         """
-        self._setup_logger()
+        self.__setup_logger()
         self.logger.debug('Initializing EMEC API object. Please wait...')
         self.logger.debug('EMEC API object initialized.')
 
@@ -35,7 +36,7 @@ class EmecAPI:
             str_name = 'EMEC API - No IES defined'
         return str_name
 
-    def _setup_logger(self) -> None:
+    def __setup_logger(self) -> None:
         """
         Sets up the logger.
 
@@ -46,7 +47,7 @@ class EmecAPI:
         self.logger.setLevel(logging.DEBUG)
         self.logger.addHandler(logging.StreamHandler())
 
-    def _handle_exception(self, method: str, exception: Exception) -> None:
+    def __handle_exception(self, method: str, exception: Exception) -> None:
         """
         Handles exceptions that occur in the specified method.
 
@@ -69,7 +70,7 @@ class EmecAPI:
             self.errors[method] = msg
             raise exception
 
-    def _check_methods(self) -> None:
+    def __check_methods(self) -> None:
         """
         Verifies and updates the list of allowed methods based on the provided methods.
 
@@ -104,24 +105,25 @@ class EmecAPI:
             None
         """
         if ies_id is None:
-            self._handle_exception('process', ValueError('ies_id is required.'))
+            self.__handle_exception('process', ValueError('ies_id is required.'))
         else:
             self.ies_id     = ies_id
             self.ies_id_b64 = convert_text_to_base64(self.ies_id)
 
         if session is None:
-            self._handle_exception('process', ValueError('AIOHTTP Session is required.'))
+            self.__handle_exception('process', ValueError('AIOHTTP Session is required.'))
         if not isinstance(session, aiohttp.ClientSession):
-            self._handle_exception('process', ValueError('AIOHTTP Session must be an instance of aiohttp.ClientSession.'))
+            self.__handle_exception('process', ValueError('AIOHTTP Session must be an instance of aiohttp.ClientSession.'))
         else:
             self.session    = session
 
-        self._check_methods()
+        self.ies_data = {}
 
+        self.__check_methods()
         for method in self.methods:
-            await self._handle_method(method)
+            await self.__handle_method(method)
 
-    async def _handle_method(self, method: str) -> None:
+    async def __handle_method(self, method: str) -> None:
         """
         Handles the specified method.
 
@@ -131,4 +133,22 @@ class EmecAPI:
         Returns:
             None
         """
+        pass
+        # match method:
+        #     case 'ies':
+        #         self.ies_data['ies'] = await self._handle_ies()
+        #     case 'metrics':
+        #         self.ies_data['metrics'] = await self._handle_metrics()
+        #     case 'regulatory_act':
+        #         self.ies_data['regulatory_act'] = await self._handle_regulatory_act()
+        #     case 'mec_process':
+        #         self.ies_data['mec_process'] = await self._handle_mec_process()
+        #     case 'campus':
+        #         self.ies_data['campus'] = await self._handle_campus()
+        #     case 'courses':
+        #         self.ies_data['courses'] = await self._handle_courses()
+        #     case _:
+        #         self.__handle_exception('__handle_method', ValueError(f'Method {method} is not allowed.'))
+
+    async def __get(self, url: str) -> BeautifulSoup:
         pass
