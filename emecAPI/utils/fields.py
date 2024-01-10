@@ -102,3 +102,22 @@ def set_url(method: str, ies_id_b64: str, course_id_b64: str = None) -> str:
                 return None
 
         return f'{base_url}{url}'
+
+def clean_boolean_fields(value: str) -> bool:
+    """Parse the boolean fields.
+
+    Args:
+        value (str): Value to be parsed.
+
+    Returns:
+        bool: Returns the parsed value.
+    """
+
+    if value is None:
+        return None
+    elif value.upper() in ['SIM', 'YES', 'S', 'Y', 'ATIVO', 'ATIVA']:
+        return True
+    elif value in ['NÃO', 'NO', 'N', 'INATIVO', 'INATIVA']:
+        return False
+    else:
+        return value
