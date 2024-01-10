@@ -1,5 +1,7 @@
-from unicodedata    import normalize
+from emecAPI.settings   import BASE_URL
+from unicodedata        import normalize
 import base64
+
 
 def normalize_key(key: str) -> str:
     """
@@ -66,7 +68,7 @@ def convert_b64_to_text(b64_text: str, encoding: str = 'utf-8') -> str:
 
 def set_url(method: str, ies_id_b64: str, course_id_b64: str = None) -> str:
 
-        base_url            = 'https://emec.mec.gov.br/emec/'
+        base_url            = BASE_URL
         url_ies_prefix      = 'consulta-ies/'
         url_course_prefix   = 'consulta-curso/'
         url_ies_divisor     = '/d96957f455f6405d14c6542552b0f6eb/'
