@@ -1,11 +1,11 @@
-from .utils.fields import convert_text_to_base64, convert_b64_to_text, normalize_key, set_url
+from .utils.fields import convert_text_to_base64, convert_b64_to_text, normalize_key, set_url, clean_boolean_fields
 import aiohttp, json
 from typing import Optional
 import logging
 from bs4 import BeautifulSoup
 
 class EmecAPI:
-    def __init__(self) -> None:
+    def __init__(self, ignore_errors: bool = False) -> None:
         """
         Initializes an instance of the EmecAPI class.
 
@@ -19,6 +19,7 @@ class EmecAPI:
         self.results    = {}
         self.errors     = {}
         self.warnings   = {}
+        self.ignore_errors = ignore_errors
 
     def __str__(self) -> str:
         """
@@ -85,7 +86,7 @@ class EmecAPI:
         self.logger.warning(msg)
         self.warnings[method] = msg
 
-    def __check_methods(self) -> None:
+    def __check_methods(self, methods: list) -> None:
         """
         Verifies and updates the list of allowed methods based on the provided methods.
 
@@ -95,7 +96,9 @@ class EmecAPI:
         Returns:
             None
         """
-        allowed_methods = ['ies', 'metrics', 'regulatory_act', 'mec_process', 'campus', 'courses']
+        allowed_methods     = ['ies', 'metrics', 'regulatory_act', 'mec_process', 'campus', 'courses']
+        dissallowed_methods = []
+        self.methods        = methods
 
         if self.methods is None or len(self.methods) == 0:
             self.methods = allowed_methods
@@ -134,7 +137,7 @@ class EmecAPI:
 
         self.ies_data = {}
 
-        self.__check_methods()
+        self.__check_methods(methods)
         for method in self.methods:
             await self.__handle_method(method)
 
@@ -148,12 +151,11 @@ class EmecAPI:
         Returns:
             None
         """
-        pass
-        # match method:
-        #     case 'ies':
-        #         self.ies_data['ies'] = await self._handle_ies()
-        #     case 'metrics':
-        #         self.ies_data['metrics'] = await self._handle_metrics()
+        match method:
+            case 'ies':
+                self.ies_data['ies'] = await self._handle_ies_data()
+            case 'metrics':
+                self.ies_data['metrics'] = await self._handle_ies_metrics()
         #     case 'regulatory_act':
         #         self.ies_data['regulatory_act'] = await self._handle_regulatory_act()
         #     case 'mec_process':
@@ -162,8 +164,8 @@ class EmecAPI:
         #         self.ies_data['campus'] = await self._handle_campus()
         #     case 'courses':
         #         self.ies_data['courses'] = await self._handle_courses()
-        #     case _:
-        #         self.__handle_exception('__handle_method', ValueError(f'Method {method} is not allowed.'))
+            case _:
+                self.__handle_exception('__handle_method', ValueError(f'Method {method} is not allowed.'))
 
     async def __get(self, method: str, course_id_b64: str = None) -> BeautifulSoup:
         """
@@ -214,3 +216,144 @@ class EmecAPI:
             self.__handle_warning('to_json', 'No data to convert to JSON.')
             return '{}'
 
+    async def _handle_ies_data(self) -> dict | None:
+
+        def __parse_data(table: str) -> dict:
+            """
+            Extracts data from a table and returns it as a dictionary.
+
+            Args:
+                table: The table element to extract data from.
+
+            Returns:
+                A dictionary containing the extracted data.
+            """
+            table_data      = table.find_all('tr', class_='avalLinhaCampos')
+            processed_data  = {}
+
+            for row in table_data:
+
+                tds = row.find_all('td')
+
+                for i in range(0, len(tds), 2):
+                    processed_data = __parse_data_table_td(tds[i:i+2]) | processed_data
+
+            return processed_data
+
+        def __parse_data_table_td(td: list) -> dict:
+            """
+            Process the table data in a <td> element and return a dictionary with the processed data.
+
+            Args:
+                td (list): A list containing two <td> elements.
+
+            Returns:
+                dict: A dictionary containing the processed data.
+
+            """
+            processed_td = {}
+            key     = normalize_key(td[0].get_text(strip=True))  # Remove blank spaces and normalize key
+            value   = td[1].get_text(strip=True)                 # Remove blank spaces
+
+            value   = value if value != '' else None              # convert empty strings to None
+            value   = clean_boolean_fields(value)                 # Convert boolean fields to boolean
+
+            # Process the data
+            if key == normalize_key('mantenedora'):
+                id              = int(value.split(') ')[0].replace('(', ''))
+                name            = value.split(') ')[1].split(' - ')[0]
+
+                processed_td[normalize_key('id')]   = id
+                processed_td[key]                   = name
+
+            elif key == normalize_key('Nome da IES - Sigla'):
+                id              = int(value.split(') ')[0].replace('(', ''))
+                name            = value.split(') ')[1].split(' - ')[0]
+                acronym         = value.split(' - ')[1] if key == normalize_key('Nome da IES - Sigla') else None
+
+                processed_td[normalize_key('id')]           = id
+                processed_td[key]                           = name
+                processed_td[normalize_key('sigla_da_ies')] = acronym
+
+            elif key == normalize_key('cnpj'):
+                value           = value.replace('.', '').replace('/', '').replace('-', '')
+                processed_td[key] = value
+            elif key == normalize_key('representante_legal'):
+                value           = value.split(' (')[0]
+                processed_td[key] = value
+            elif key == normalize_key('tipo_de_credenciamento'):
+                processed_td[key] = None
+                values           = value.split('/')
+                values          = [value.strip() for value in values]
+
+                all_values = []
+
+                for i, value in enumerate(values):
+                    key_name = normalize_key(key + ' ' + str(i+1))
+                    all_values.append(value)
+
+                processed_td[key] = all_values
+
+            elif key == normalize_key('telefone') or key == normalize_key('fax'):
+                phones = value.split(' ')
+                phones = [phone.replace('(', '+55').replace(')','') for phone in phones]
+
+                all_phones = {}
+
+                for i, phone in enumerate(phones):
+                    key_name = normalize_key(key + ' ' + str(i+1))
+                    all_phones.update({key_name: phone})
+
+                processed_td[key] = all_phones
+            else:
+                processed_td[key] = value
+
+            return processed_td
+
+        parsed_data  = {}
+        ies_data    = await self.__get('ies')
+
+        if ies_data is None:
+            return None
+
+        ies_tables = ies_data.find_all('table', class_='avalTabCampos')
+
+        ies_maintainer_table        = ies_tables[0]
+        parsed_data['maintainer']   = __parse_data(ies_maintainer_table)
+
+        ies_data_table              = ies_tables[1]
+        parsed_data['ies']          = __parse_data(ies_data_table)
+
+        return parsed_data
+
+    async def _handle_ies_metrics(self) -> dict | None:
+        parsed_data     = {}
+        metrics_data    = await self.__get('metrics')
+
+        if metrics_data is None:
+            return None
+
+        metrics_table = metrics_data.find('table')
+
+        for row in metrics_table.find_all('tr'):
+            tds = row.find_all('td')
+            tds = [td.get_text(strip=True) for td in tds if td.get_text(strip=True) != '']
+
+            if len(tds) == 0:
+                continue
+            else:
+                year   = tds[0] if tds[0] != '-' else None
+                ci     = int(tds[1]) if tds[1] != '-' else None
+                igc    = int(tds[2]) if tds[2] != '-' else None
+                ci_ead = int(tds[3]) if tds[3] != '-' else None
+
+                year = normalize_key(year)
+
+
+                parsed_data[year] = {
+                    normalize_key('ci'): ci,
+                    normalize_key('igc'): igc,
+                    normalize_key('ci_ead'): ci_ead
+                }
+
+        return parsed_data
