@@ -1,4 +1,4 @@
-from emecAPI.utils.fields import normalize_key, convert_text_to_base64, convert_b64_to_text, set_url
+from emecAPI.utils.fields import normalize_key, convert_text_to_base64, convert_b64_to_text, set_url, clean_boolean_fields
 import base64
 
 def test_normalize_key():
@@ -79,3 +79,43 @@ def test_set_url():
 
     # Test case 9: Testing unknown method
     assert set_url('unknown', 'def456') == None
+
+def test_clean_boolean_fields():
+    # Test case 1: Parsing a boolean value 'SIM'
+    assert clean_boolean_fields('SIM') == True
+
+    # Test case 2: Parsing a boolean value 'YES'
+    assert clean_boolean_fields('YES') == True
+
+    # Test case 3: Parsing a boolean value 'S'
+    assert clean_boolean_fields('S') == True
+
+    # Test case 4: Parsing a boolean value 'Y'
+    assert clean_boolean_fields('Y') == True
+
+    # Test case 5: Parsing a boolean value 'ATIVO'
+    assert clean_boolean_fields('ATIVO') == True
+
+    # Test case 6: Parsing a boolean value 'ATIVA'
+    assert clean_boolean_fields('ATIVA') == True
+
+    # Test case 7: Parsing a boolean value 'NÃO'
+    assert clean_boolean_fields('NÃO') == False
+
+    # Test case 8: Parsing a boolean value 'NO'
+    assert clean_boolean_fields('NO') == False
+
+    # Test case 9: Parsing a boolean value 'N'
+    assert clean_boolean_fields('N') == False
+
+    # Test case 10: Parsing a boolean value 'INATIVO'
+    assert clean_boolean_fields('INATIVO') == False
+
+    # Test case 11: Parsing a boolean value 'INATIVA'
+    assert clean_boolean_fields('INATIVA') == False
+
+    # Test case 12: Parsing a boolean value 'OTHER'
+    assert clean_boolean_fields('OTHER') == 'OTHER'
+
+    # Test case 13: Parsing a boolean value None
+    assert clean_boolean_fields(None) == None
