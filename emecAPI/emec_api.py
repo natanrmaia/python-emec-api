@@ -272,7 +272,7 @@ class EmecAPI:
                 acronym         = value.split(' - ')[1] if key == normalize_key('Nome da IES - Sigla') else None
 
                 processed_td[normalize_key('id')]           = id
-                processed_td[key]                           = name
+                processed_td[normalize_key('nome_da_ies')]  = name
                 processed_td[normalize_key('sigla_da_ies')] = acronym
 
             elif key == normalize_key('cnpj'):
@@ -298,11 +298,10 @@ class EmecAPI:
                 phones = value.split(' ')
                 phones = [phone.replace('(', '+55').replace(')','') for phone in phones]
 
-                all_phones = {}
+                all_phones = []
 
                 for i, phone in enumerate(phones):
-                    key_name = normalize_key(key + ' ' + str(i+1))
-                    all_phones.update({key_name: phone})
+                    all_phones.append(phone)
 
                 processed_td[key] = all_phones
             else:
