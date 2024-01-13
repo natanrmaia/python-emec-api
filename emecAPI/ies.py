@@ -125,7 +125,7 @@ class IesAPI:
             ignore_errors (bool, optional): If set to True, errors will be ignored. If set to False, errors will be raised.
 
         Returns:
-            None
+            self: Returns the EMEC API object.
         """
 
         if logger is not None:
@@ -151,11 +151,11 @@ class IesAPI:
         self.logger.debug('EMEC API object initialized with the following parameters:')
         self.logger.debug(f'IES ID: {self.ies_id} | Methods: {methods} | Ignore errors: {self.ignore_errors}')
 
-
         self.__check_methods(methods)
 
         method_tasks = [self.__handle_method(method) for method in self.methods]
         await asyncio.gather(*method_tasks)
+        return self
 
     async def __handle_method(self, method: str) -> None:
         """
@@ -168,25 +168,27 @@ class IesAPI:
             None
         """
 
-        ies_data = {}
+        data = {}
 
         match method:
             case 'ies':
-                ies_data               = ies_data | await self._handle_ies_data()
+                data                = await self._handle_ies_data()
             case 'metrics':
-                ies_data['metrics']    = await self._handle_ies_metrics()
+                data                = await self._handle_ies_metrics()
             case 'regulatory_act':
-                ies_data               = ies_data | await self._handle_ies_regulatory_act()
+                data                = await self._handle_ies_regulatory_act()
             case 'mec_process':
-                ies_data['mec_process'] = await self._handle_ies_mec_process()
-        #     case 'campus':
-        #         ies_data['campus'] = await self._handle_campus()
-        #     case 'courses':
+                data                = await self._handle_ies_mec_process()
+            case 'campus':
+                pass
+                # ies_data['campus'] = await self._handle_campus()
+            case 'courses':
+                pass
         #         ies_data['courses'] = await self._handle_courses()
             case _:
-                self.__handle_exception('__handle_method', ValueError(f'Method {method} is not allowed.'))
+                self.__handle_exception('__handle_method', ValueError(f'Method {method} is not supported.'))
 
-        self.ies_data = ies_data
+        self.ies_data.update(data)
 
     async def __get(self, method: str, course_id_b64: str = None) -> BeautifulSoup:
         """
@@ -213,7 +215,6 @@ class IesAPI:
             else:
                 self.__handle_exception('__get', Exception(f'HTTP {response.status} - {response.reason}'))
 
-
     async def to_dict(self) -> dict:
         """Converts the data to dict format.
 
@@ -225,18 +226,6 @@ class IesAPI:
         else:
             self.__handle_warning('to_dict', 'No data to convert to dict for the specified IES.')
             return {}
-
-    def to_json(self) -> str:
-        """Converts the data to JSON format.
-
-        Returns:
-            str: Returns the data in JSON format.
-        """
-        if self.ies_data:
-            return json.dumps(self.ies_data)
-        else:
-            self.__handle_warning('to_json', 'No data to convert to JSON.')
-            return '{}'
 
     async def _handle_ies_data(self) -> dict | None:
 
@@ -349,6 +338,7 @@ class IesAPI:
 
     async def _handle_ies_metrics(self) -> dict | None:
         parsed_data     = {}
+        processed_data  = {}
         current_line    = 0
         metrics_data    = await self.__get('metrics')
 
@@ -379,8 +369,10 @@ class IesAPI:
                     normalize_key('ci_ead'): ci_ead
                 }
 
-                parsed_data[current_line] = data
+                processed_data[current_line] = data
                 current_line += 1
+
+        parsed_data['metrics'] = processed_data
 
         return parsed_data
 
@@ -445,6 +437,7 @@ class IesAPI:
 
     async def _handle_ies_mec_process(self) -> dict | None:
         parsed_data     = {}
+        processed_data  = {}
         current_line    = 0
         process_data    = await self.__get('mec_process')
 
@@ -472,7 +465,9 @@ class IesAPI:
                 "status": status
             }
 
-            parsed_data[current_line] = process
+            processed_data[current_line] = process
             current_line += 1
+
+        parsed_data['mec_process'] = processed_data
 
         return parsed_data
