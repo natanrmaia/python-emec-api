@@ -180,8 +180,7 @@ class IesAPI:
             case 'mec_process':
                 data                = await self._handle_ies_mec_process()
             case 'campus':
-                pass
-                # ies_data['campus'] = await self._handle_campus()
+                data                = await self._handle_ies_campus()
             case 'courses':
                 pass
         #         ies_data['courses'] = await self._handle_courses()
@@ -412,7 +411,6 @@ class IesAPI:
                         if tds[i+1].find('img', class_='link') is None:
                             value = None
                         else:
-                            # value = self.BASE_URL + tds[i+1].find('img', class_='link').get('onclick').split('emec/')[1].split("'")[0]
                             value = BASE_URL + tds[i+1].find('img', class_='link').get('onclick').split('emec/')[1].split("'")[0]
                     else:
                         value = tds[i+1].get_text(strip=True)
@@ -469,5 +467,56 @@ class IesAPI:
             current_line += 1
 
         parsed_data['mec_process'] = processed_data
+
+        return parsed_data
+
+    async def _handle_ies_campus(self) -> dict | None:
+        parsed_data     = {}
+        current_line    = 0
+        processed_data  = {}
+        campus_data     = await self.__get('campus')
+
+        if campus_data is None:
+            return None
+
+        if campus_data is None:
+            return None
+
+        data = campus_data.find('table', id='listar-ies-cadastro')
+        if data is None:
+            return None
+
+        trs        = data.find_all('tr', class_='corDetalhe2') + data.find_all('tr', class_='corDetalhe1')
+        campuses   = {}
+
+        for tr in trs:
+            tds = tr.find_all('td')
+
+            id          = tds[0].get_text(strip=True) if tds[0].get_text(strip=True) != '' else None
+            name        = tds[1].get_text(strip=True) if tds[1].get_text(strip=True) != '' else None
+            address     = tds[2].get_text(strip=True) if tds[2].get_text(strip=True) != '' else None
+            polo        = tds[3].get_text(strip=True) if tds[3].get_text(strip=True) != '' else None
+            city        = tds[4].get_text(strip=True) if tds[4].get_text(strip=True) != '' else None
+            state       = tds[5].get_text(strip=True) if tds[5].get_text(strip=True) != '' else None
+
+            address_number = address.split(',')[0].split(' ')[-1]
+            address_street = address.split(',')[0].split(' ')[0:-1]
+            address_neighborhood = address.split(',')[1].strip()
+
+            campuses[current_line] = {
+                "id": id,
+                "name": name,
+                "polo": polo,
+                "address": {
+                    "street": ' '.join(address_street),
+                    "number": address_number,
+                    "neighborhood": address_neighborhood,
+                    "city": city,
+                    "state": state
+                },
+            }
+            current_line += 1
+
+        parsed_data['campus'] = campuses
 
         return parsed_data
