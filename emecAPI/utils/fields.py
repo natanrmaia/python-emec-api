@@ -105,9 +105,11 @@ def set_url(method: str, ies_id_b64: str, course_id_b64: str = None) -> str:
             case 'course_single_indicators':
                 query   = 'listar-historico-indicadores-curso'
                 url     = f'{url_course_prefix}{query}{url_course_single_divisor}{course_id_b64}{url_suffix_list}'
+            case 'course_single_campus':
+                query   = 'listar-endereco-curso'
+                url     = f'{url_course_prefix}{query}{url_ies_divisor}{ies_id_b64}{url_course_single_divisor}{course_id_b64}{url_suffix_list}'
             case _:
                 return None
-        # print(url)
         return f'{base_url}{url}'
 
 def clean_boolean_fields(value: str) -> bool:
