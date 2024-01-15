@@ -580,8 +580,13 @@ class IesAPI:
             processed_data[title] = value
 
         course_id_int                   = convert_text_to_base64(course_id_int)
+        course_detail_data              = await self.__handle_single_course_detail(course_id_int)
+        processed_data.update(course_detail_data)
+
         course_indicators_data          = await self.__handle_single_course_indicators(course_id_int)
+
         processed_data['indicators']    = course_indicators_data
+
 
         parsed_data = processed_data
 
@@ -630,6 +635,39 @@ class IesAPI:
 
                 processed_data[current_line] = data
                 current_line += 1
+
+        parsed_data = processed_data
+
+        return parsed_data
+
+    async def __handle_single_course_detail(self, course_id_b64: str) -> dict | None:
+        parsed_data = {}
+        course_data = await self.__get('course_single_detail', course_id_b64=course_id_b64)
+
+        if course_data is None:
+            return None
+
+        data = course_data.find('table')
+        if data is None:
+            return None
+
+        titles = data.find('tr', class_='corTitulo').find_all('th')
+        trs    = data.find_all('tr', class_='corDetalhe2') + data.find_all('tr', class_='corDetalhe1')
+
+        titles = [title.get_text(strip=True) for title in titles]
+
+        processed_data = {}
+        for tr in trs:
+            tds = tr.find_all('td')
+
+            for td in enumerate(tds):
+                key = normalize_key(titles[td[0]])
+                value = td[1].get_text(strip=True)
+
+                if key == 'codigo_grau':
+                    continue
+                else:
+                    processed_data[key] = value
 
         parsed_data = processed_data
 
