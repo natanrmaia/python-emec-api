@@ -584,8 +584,10 @@ class IesAPI:
         processed_data.update(course_detail_data)
 
         course_indicators_data          = await self.__handle_single_course_indicators(course_id_int)
-
         processed_data['indicators']    = course_indicators_data
+
+        course_campus_data              = await self.__handle_single_course_campus(course_id_int)
+        processed_data['campus']        = course_campus_data
 
 
         parsed_data = processed_data
@@ -662,13 +664,73 @@ class IesAPI:
 
             for td in enumerate(tds):
                 key = normalize_key(titles[td[0]])
-                value = td[1].get_text(strip=True)
 
                 if key == 'codigo_grau':
                     continue
+                elif key == 'periodicidade_integralizacao':
+                    value = td[1].get_text(separator='|').split('|')
+                    value = [v.strip() for v in value if v.strip() != '']
+                    data = []
+                    for v in value:
+                        split = v.split(' - ')
+                        data.append({
+                            'period': split[0],
+                            'duration': split[1]
+                        })
+                    value = data
+                    processed_data[key] = value
                 else:
+                    value = td[1].get_text(strip=True)
                     processed_data[key] = value
 
         parsed_data = processed_data
+
+        return parsed_data
+
+    async def __handle_single_course_campus(self, course_id_b64: str) -> dict | None:
+        parsed_data = {}
+        current_line = 0
+        course_data = await self.__get('course_single_campus', course_id_b64=course_id_b64)
+
+        if course_data is None:
+            return None
+
+        data = course_data.find('table', id='listar-ies-cadastro')
+        if data is None:
+            return None
+
+        titles = data.find('tr', class_='corTitulo').find_all('th')
+        titles = [title.get_text(strip=True) for title in titles]
+        trs    = data.find_all('tr', class_='corDetalhe2') + data.find_all('tr', class_='corDetalhe1')
+
+        campuses   = {}
+
+        for tr in trs:
+            tds = tr.find_all('td')
+
+            name        = tds[0].get_text(strip=True) if tds[0].get_text(strip=True) != '' else None
+            address     = tds[1].get_text(strip=True) if tds[1].get_text(strip=True) != '' else None
+            cep         = tds[2].get_text(strip=True) if tds[2].get_text(strip=True) != '' else None
+            city        = tds[3].get_text(strip=True) if tds[3].get_text(strip=True) != '' else None
+            state       = tds[4].get_text(strip=True) if tds[4].get_text(strip=True) != '' else None
+
+            address_number = address.split(',')[0].split(' ')[-1] if len(address.split(',')) > 1 else None
+            address_street = address.split(',')[0].split(' ')[0:-1] if len(address.split(',')) > 1 else address
+            address_neighborhood = address.split(',')[1].strip() if len(address.split(',')) > 1 else None
+
+            campuses[current_line] = {
+                "name": name,
+                "address": {
+                    "street": ' '.join(address_street) if address_street is not None else None,
+                    "number": address_number,
+                    "neighborhood": address_neighborhood,
+                    "cep": cep,
+                    "city": city,
+                    "state": state
+                },
+            }
+            current_line += 1
+
+        parsed_data = campuses
 
         return parsed_data
