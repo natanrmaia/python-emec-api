@@ -182,8 +182,7 @@ class IesAPI:
             case 'campus':
                 data                = await self._handle_ies_campus()
             case 'courses':
-                pass
-        #         ies_data['courses'] = await self._handle_courses()
+                data                = await self._handle_ies_courses()
             case _:
                 self.__handle_exception('__handle_method', ValueError(f'Method {method} is not supported.'))
 
@@ -518,5 +517,120 @@ class IesAPI:
             current_line += 1
 
         parsed_data['campus'] = campuses
+
+        return parsed_data
+
+    async def _handle_ies_courses(self) -> dict | None:
+        parsed_data     = {}
+        courses_ids     = []
+        courses_data    = await self.__get('courses_list')
+
+        if courses_data is None:
+            return None
+
+        data = courses_data.find('table', id='listar-ies-cadastro')
+        if data is None:
+            return None
+
+        trs = data.find_all('tr', class_='corDetalhe_2') + data.find_all('tr', class_='corDetalhe_1')
+
+        for tr in trs:
+            tds = tr.find_all('td', class_='tooltip')
+
+            course_name     = tds[0].find('a').get_text(strip=True)
+            course_id_64    = convert_text_to_base64(course_name)
+            courses_ids.append(course_id_64)
+
+        courses_ids = set(courses_ids)
+        courses     = [await self.__handle_single_course(courses_id) for courses_id in courses_ids]
+        parsed_data['courses'] = courses
+
+        return parsed_data
+
+    async def __handle_single_course(self, course_id_b64: str) -> dict | None:
+        parsed_data = {}
+        course_data = await self.__get('course_single_name', course_id_b64=course_id_b64)
+
+        if course_data is None:
+            return None
+
+        data = course_data.find('table', id='listar-ies-cadastro')
+        if data is None:
+            return None
+
+        titles = data.find('tr', class_='corTitulo').find_all('th')
+        trs    = data.find_all('tr', class_='corDetalhe2') + data.find_all('tr', class_='corDetalhe1')
+        processed_data = {}
+
+        for title in enumerate(titles):
+            title_index = title[0]
+            title = title[1].get_text(strip=True)
+            title = normalize_key(title)
+            value = trs[0].find_all('td')[title_index]
+
+            if title in ['cpc', 'cc', 'cc_ead', 'cpc_ead', 'idd', 'enade', 'uf', 'municipio']:
+                continue
+            elif title == 'situacao':
+                value = value.find('img').get('title')
+            elif title == 'codigo':
+                value = value.get_text(strip=True)
+                course_id_int = int(value)
+            else:
+                value = value.get_text(strip=True)
+            processed_data[title] = value
+
+        course_id_int                   = convert_text_to_base64(course_id_int)
+        course_indicators_data          = await self.__handle_single_course_indicators(course_id_int)
+        processed_data['indicators']    = course_indicators_data
+
+        parsed_data = processed_data
+
+        return parsed_data
+
+    async def __handle_single_course_indicators(self, course_id_b64: str) -> dict | None:
+        """
+        Retrieves and processes single course indicators data.
+
+        Args:
+            course_id_b64 (str): The base64 encoded course ID.
+
+        Returns:
+            dict | None: A dictionary containing the processed indicators data, or None if the data is not available.
+        """
+        parsed_data         = {}
+        processed_data      = {}
+        current_line        = 0
+        indicators_data     = await self.__get('course_single_indicators', course_id_b64=course_id_b64)
+
+        if indicators_data is None:
+            return None
+
+        metrics_table = indicators_data.find('table')
+
+        for row in metrics_table.find_all('tr'):
+            tds = row.find_all('td')
+            tds = [td.get_text(strip=True) for td in tds if td.get_text(strip=True) != '']
+
+            if len(tds) == 0 or len(tds) != 5:
+                continue
+            else:
+                year   = tds[0] if tds[0] != '-' else None
+                enade  = int(tds[1]) if tds[1] != '-' else None
+                cpc    = int(tds[2]) if tds[2] != '-' else None
+                cc     = int(tds[3]) if tds[3] != '-' else None
+                idd    = int(tds[4]) if tds[4] != '-' else None
+
+                data = {
+                    normalize_key('year'): year,
+                    normalize_key('enade'): enade,
+                    normalize_key('cpc'): cpc,
+                    normalize_key('cc'): cc,
+                    normalize_key('idd'): idd
+                }
+
+                processed_data[current_line] = data
+                current_line += 1
+
+        parsed_data = processed_data
 
         return parsed_data

@@ -73,6 +73,8 @@ def set_url(method: str, ies_id_b64: str, course_id_b64: str = None) -> str:
         url_course_prefix   = 'consulta-curso/'
         url_ies_divisor     = '/d96957f455f6405d14c6542552b0f6eb/'
         url_course_divisor  = '/9f1aa921d96ca1df24a34474cc171f61/'
+        url_course_single_divisor = '/c1999930082674af6577f0c513f05a96/'
+        url_course_detail_divisor = '/c1b85ea4d704f246bcced664fdaeddb6/'
         url_suffix_list     = '/list/1000'
 
         match method:
@@ -91,18 +93,21 @@ def set_url(method: str, ies_id_b64: str, course_id_b64: str = None) -> str:
             case 'campus':
                 query   = 'listar-endereco'
                 url     = f'{url_ies_prefix}{query}{url_ies_divisor}{ies_id_b64}{url_suffix_list}'
-            case 'courses':
-                query   = 'listar-curso'
+            case 'courses_list':
+                query   = 'listar-curso-agrupado'
                 url     = f'{url_ies_prefix}{query}{url_ies_divisor}{ies_id_b64}{url_suffix_list}'
-            case 'courses_details_info_general':
-                query   = 'detalhe-curso'
-                url     = f'{url_course_prefix}{query}{url_course_divisor}0/{ies_id_b64}/{course_id_b64}'
-            case 'courses_details_detail':
-                query   = 'detalhe-curso'
-                url     = f'{url_course_prefix}{query}{url_course_divisor}1/{ies_id_b64}/{course_id_b64}'
+            case 'course_single_name':
+                query   = 'listar-curso-desagrupado'
+                url     = f'{url_course_prefix}{query}{url_course_divisor}0{url_ies_divisor}{ies_id_b64}{url_course_detail_divisor}{course_id_b64}{url_suffix_list}'
+            case 'course_single_detail':
+                query   = 'detalhe-curso-tabela'
+                url     = f'{url_course_prefix}{query}{url_course_single_divisor}{course_id_b64}'
+            case 'course_single_indicators':
+                query   = 'listar-historico-indicadores-curso'
+                url     = f'{url_course_prefix}{query}{url_course_single_divisor}{course_id_b64}{url_suffix_list}'
             case _:
                 return None
-
+        # print(url)
         return f'{base_url}{url}'
 
 def clean_boolean_fields(value: str) -> bool:
