@@ -3,7 +3,7 @@ This package is designed to make it easy to use the [EMEC Data](https://emec.mec
 
 ## Documentation
 
-- In development..
+- In development...
 
 ## Author
 
@@ -11,7 +11,7 @@ This package is designed to make it easy to use the [EMEC Data](https://emec.mec
 
 ## Instalation
 ```python
-  In development
+  pip install python-emec-api
 ```
 
 ## Report or Request
