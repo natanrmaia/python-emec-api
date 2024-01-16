@@ -1,0 +1,1 @@
+BASE_URL = 'https://emec.mec.gov.br/emec/'
